@@ -1,98 +1,190 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Identity Service
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+A microservice for user authentication and management within the LMS (Learning Management System) architecture. Handles user registration, login, JWT token management, and user profile operations.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Architecture
 
-## Description
+The identity-service is a core microservice responsible for:
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+- **User Registration**: Create new user accounts with secure password hashing
+- **Authentication**: Login users and issue JWT tokens
+- **Token Management**: Validate JWT tokens for protected endpoints
+- **User Profile**: Retrieve and manage user profile information
+- **Security**: Password hashing with bcrypt and secure token handling
 
-## Project setup
+This service is part of a microservices-based LMS architecture, communicating with other services via NATS messaging and maintaining its own PostgreSQL database.
 
-```bash
-$ npm install
+## Requirements
+
+- **Node.js** 18+ 
+- **Docker Desktop** (for local development)
+- **PostgreSQL** (runs via Docker Compose)
+
+## Environment Variables
+
+Create a `.env` file in the service root:
+
+```env
+DATABASE_URL="postgresql://lms:lms@localhost:5433/identity_db?schema=public"
+JWT_SECRET="dev_secret_change_me"
+JWT_EXPIRES_IN="15m"
 ```
 
-## Compile and run the project
+## Run Locally
+
+1. **Start infrastructure services** (from repo root):
+   ```bash
+   docker compose -f infra/docker-compose.yml up -d
+   ```
+
+2. **Navigate to identity service**:
+   ```bash
+   cd services/identity-service
+   ```
+
+3. **Install dependencies**:
+   ```bash
+   npm install
+   ```
+
+4. **Run database migrations** (if needed):
+   ```bash
+   npx prisma migrate dev
+   ```
+
+5. **Start the service**:
+   ```bash
+   npm run start:dev
+   ```
+
+The service will be available at `http://localhost:3001`
+
+## API Endpoints
+
+### Health Check
 
 ```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
+curl http://localhost:3001/health
 ```
 
-## Run tests
+**Response:**
+```json
+{
+  "status": "ok"
+}
+```
+
+### Register User
 
 ```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+curl -X POST http://localhost:3001/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com",
+    "mobile": "+1234567890",
+    "password": "password123",
+    "name": "John Doe",
+    "role": "STUDENT"
+  }'
 ```
 
-## Deployment
+**Success Response (201):**
+```json
+{
+  "id": "uuid",
+  "email": "user@example.com",
+  "mobile": "+1234567890",
+  "name": "John Doe",
+  "role": "STUDENT",
+  "createdAt": "2024-01-01T00:00:00.000Z"
+}
+```
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+**Error Responses:**
+- `400` - Validation errors
+- `409` - Email or mobile already exists
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+### Login
 
 ```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+curl -X POST http://localhost:3001/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com",
+    "password": "password123"
+  }'
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+**Success Response (200):**
+```json
+{
+  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+```
 
-## Resources
+**Error Responses:**
+- `401` - Invalid credentials
 
-Check out a few resources that may come in handy when working with NestJS:
+### Get Current User Profile
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+```bash
+# First, login to get a token
+curl -X POST http://localhost:3001/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "user@example.com", "password": "password123"}'
 
-## Support
+# Copy the accessToken from the response, then:
+curl -X GET http://localhost:3001/auth/me \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN_HERE"
+```
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+**Success Response (200):**
+```json
+{
+  "id": "uuid",
+  "email": "user@example.com",
+  "mobile": "+1234567890",
+  "name": "John Doe",
+  "role": "STUDENT",
+  "createdAt": "2024-01-01T00:00:00.000Z"
+}
+```
 
-## Stay in touch
+**Error Responses:**
+- `401` - Missing, invalid, or expired token
+- `401` - User not found
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+## Testing
 
-## License
+Run the test suite:
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+```bash
+# Unit tests
+npm run test
+
+# End-to-end tests
+npm run test:e2e
+
+# Test coverage
+npm run test:cov
+```
+
+**Note**: CI pipeline runs linting, build, and all tests automatically.
+
+## Contributing
+
+We welcome contributions! Please follow these guidelines:
+
+- **Pull Requests Required**: All changes must be submitted via PR
+- **CI Must Pass**: All checks (lint, build, tests) must pass
+- **Branch Protection**: PRs target protected branches (main/develop)
+- **Focused Changes**: Keep PRs small and focused on single features/fixes
+- **Code Quality**: Follow existing code patterns and maintain test coverage
+
+## Development Notes
+
+- Service runs on port `3001`
+- Database: PostgreSQL on port `5433`
+- JWT tokens expire in 15 minutes by default
+- Passwords are hashed using bcrypt with salt rounds of 10
+- All endpoints use global validation pipe for input sanitization
