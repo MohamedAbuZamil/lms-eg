@@ -63,6 +63,7 @@ export class AppController {
     const payload = {
       sub: user.id,
       email: user.email,
+      role: user.role,
     };
 
     const accessToken = await this.jwt.signAsync(payload);
