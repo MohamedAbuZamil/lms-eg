@@ -1,0 +1,27 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum StaffStatus {
+  ACTIVE
+  BLOCKED
+}
+
+model TeacherStaff {
+  id                   String      @id @default(uuid())
+  teacherId            String
+  assistantUserId      String
+  canManageCourses     Boolean     @default(false)
+  canManageEnrollments Boolean     @default(false)
+  status               StaffStatus @default(ACTIVE)
+  createdAt            DateTime    @default(now())
+  updatedAt            DateTime    @updatedAt
+
+  @@unique([teacherId, assistantUserId])
+  @@map("teacher_staff")
+}

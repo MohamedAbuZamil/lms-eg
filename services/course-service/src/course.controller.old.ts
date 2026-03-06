@@ -68,6 +68,7 @@ export class CourseController {
   }
 }
 
+// Separate controller for teachers routes
 @Controller('teachers')
 export class TeacherController {
   constructor(private readonly courseService: CourseService) {}

@@ -4,6 +4,7 @@ import {
   IsNumber,
   IsNotEmpty,
   Min,
+  IsUUID,
 } from "class-validator";
 
 export class CreateCourseDto {
@@ -18,4 +19,9 @@ export class CreateCourseDto {
   @IsNumber()
   @Min(0)
   price: number;
+
+  @IsString()
+  @IsNotEmpty()
+  @IsUUID()
+  gradeId: string;
 }

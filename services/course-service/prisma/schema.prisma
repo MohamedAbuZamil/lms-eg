@@ -7,13 +7,27 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model Grade {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  
+  courses   Course[]
+  
+  @@map("grades")
+}
+
 model Course {
   id          String   @id @default(uuid())
   title       String
   description String?
   price       Int
   teacherId   String
+  gradeId     String
   createdAt   DateTime @default(now())
 
+  grade       Grade    @relation(fields: [gradeId], references: [id])
+
   @@unique([teacherId, title])
+  @@map("courses")
 }
