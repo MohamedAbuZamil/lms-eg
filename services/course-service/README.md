@@ -166,7 +166,7 @@ Authorization: Bearer <teacher_jwt_token>
 - `401 Unauthorized` - Missing, invalid, or expired token
 - `403 Forbidden` - User is not a TEACHER
 - `400 Bad Request` - Validation errors in request body
-- `500 Internal Server Error` - Database constraint violation (duplicate title)
+- `409 Conflict` - Database constraint violation (duplicate title)
 
 **Example Request:**
 ```bash
@@ -265,6 +265,149 @@ curl http://localhost:3002/courses/e2f0d354-76ad-4b19-8368-353cad0de474
   "statusCode": 404
 }
 ```
+
+### ✏️ Update Course
+
+**Endpoint:** `PATCH /courses/:id`
+
+**Description:** Update an existing course (TEACHER only, owner only)
+
+**Authentication:** Required (TEACHER role)
+
+**Request Headers:**
+```http
+Content-Type: application/json
+Authorization: Bearer <teacher_jwt_token>
+```
+
+**Request Body:**
+```json
+{
+  "title": "Updated Course Title",
+  "description": "Updated description",
+  "price": 199
+}
+```
+
+**Request Body Schema:**
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `title` | string | ❌ | New course title (unique per teacher) |
+| `description` | string | ❌ | Course description |
+| `price` | number | ❌ | Course price (must be ≥ 0) |
+
+**Response (200):**
+```json
+{
+  "id": "e2f0d354-76ad-4b19-8368-353cad0de474",
+  "title": "Updated Course Title",
+  "description": "Updated description",
+  "price": 199,
+  "teacherId": "94c55b09-c43d-465d-86a3-74df03a494cd",
+  "createdAt": "2026-03-05T22:47:07.742Z"
+}
+```
+
+**Error Responses:**
+- `401 Unauthorized` - Missing, invalid, or expired token
+- `403 Forbidden` - User is not a TEACHER or not course owner
+- `404 Not Found` - Course with specified ID does not exist
+- `400 Bad Request` - Validation errors in request body
+- `409 Conflict` - Course with this title already exists for this teacher
+
+**Example Request:**
+```bash
+curl -X PATCH http://localhost:3002/courses/e2f0d354-76ad-4b19-8368-353cad0de474 \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
+  -d '{
+    "title": "Updated Course Title",
+    "price": 199
+  }'
+```
+
+### 🗑️ Delete Course
+
+**Endpoint:** `DELETE /courses/:id`
+
+**Description:** Delete a course (TEACHER only, owner only)
+
+**Authentication:** Required (TEACHER role)
+
+**Request Headers:**
+```http
+Authorization: Bearer <teacher_jwt_token>
+```
+
+**Response (204):** No content (successful deletion)
+
+**Error Responses:**
+- `401 Unauthorized` - Missing, invalid, or expired token
+- `403 Forbidden` - User is not a TEACHER or not course owner
+- `404 Not Found` - Course with specified ID does not exist
+
+**Example Request:**
+```bash
+curl -X DELETE http://localhost:3002/courses/e2f0d354-76ad-4b19-8368-353cad0de474 \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+```
+
+### 👨‍🏫 Get Teacher's Courses
+
+**Endpoint:** `GET /teachers/me/courses`
+
+**Description:** Get all courses belonging to the authenticated teacher
+
+**Authentication:** Required (TEACHER role)
+
+**Request Headers:**
+```http
+Authorization: Bearer <teacher_jwt_token>
+```
+
+**Response (200):**
+```json
+[
+  {
+    "id": "e2f0d354-76ad-4b19-8368-353cad0de474",
+    "title": "Introduction to Programming",
+    "description": "Learn the basics of programming",
+    "price": 99,
+    "teacherId": "94c55b09-c43d-465d-86a3-74df03a494cd",
+    "createdAt": "2026-03-05T22:47:07.742Z"
+  },
+  {
+    "id": "f3g1h456-87be-5c20-9479-464dbe1ef585",
+    "title": "Advanced JavaScript",
+    "description": "Deep dive into JavaScript",
+    "price": 149,
+    "teacherId": "94c55b09-c43d-465d-86a3-74df03a494cd",
+    "createdAt": "2026-03-05T22:45:00.000Z"
+  }
+]
+```
+
+**Response Schema:**
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | string | Course UUID |
+| `title` | string | Course title |
+| `description` | string | Course description |
+| `price` | number | Course price |
+| `teacherId` | string | Teacher's UUID |
+| `createdAt` | string | ISO 8601 timestamp |
+
+**Error Responses:**
+- `401 Unauthorized` - Missing, invalid, or expired token
+- `403 Forbidden` - User is not a TEACHER
+
+**Example Request:**
+```bash
+curl http://localhost:3002/teachers/me/courses \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+```
+
+**Note:** Courses are returned in descending order by creation date (newest first).
 
 ## 🧪 Testing Guide
 
@@ -392,7 +535,7 @@ curl -X POST http://localhost:3002/courses \
     "price": 149
   }'
 
-# Expected: 500 Internal Server Error (database constraint violation)
+# Expected: 409 Conflict (database constraint violation)
 ```
 
 #### Scenario 5: Public Endpoint Tests
