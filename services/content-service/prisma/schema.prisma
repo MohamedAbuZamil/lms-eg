@@ -1,0 +1,112 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum LessonType {
+  VIDEO
+  PDF
+  TEXT
+  FILE
+}
+
+enum VideoProvider {
+  YOUTUBE
+  VIMEO
+  MUX
+  BUNNY
+  GOOGLE_DRIVE
+  CUSTOM
+}
+
+enum PlaybackProtection {
+  BASIC
+  TOKENIZED
+  SIGNED
+  EMBED_ONLY
+}
+
+model Section {
+  id        String   @id @default(uuid())
+  courseId  String
+  title     String
+  order     Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  lessons Lesson[]
+
+  @@unique([courseId, order])
+}
+
+model Lesson {
+  id                      String             @id @default(uuid())
+  sectionId               String
+  title                   String
+  type                    LessonType
+  content                 String?
+  url                     String?
+  order                   Int
+  isPreview               Boolean            @default(false)
+  videoProvider           VideoProvider?
+  providerVideoId         String?
+  providerVideoUrl        String?
+  playbackProtection      PlaybackProtection @default(BASIC)
+  allowDownload           Boolean            @default(false)
+  
+  // View Limit Policy Fields
+  viewLimitEnabled        Boolean            @default(false)
+  maxViews                Int?
+  viewCooldownHours       Int?               @default(6)
+  countOnlyAfterPlaybackStart Boolean        @default(true)
+  allowUnlimitedViews     Boolean            @default(false)
+  
+  createdAt               DateTime           @default(now())
+  updatedAt               DateTime           @updatedAt
+
+  // Relations
+  section                 Section            @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  lessonViewUsages        LessonViewUsage[]
+  lessonViewOverrides     LessonViewOverride[]
+
+  @@unique([sectionId, order])
+}
+
+model LessonViewUsage {
+  id                String   @id @default(uuid())
+  userId            String
+  lessonId          String
+  viewsConsumed     Int      @default(0)
+  lastCountedViewAt DateTime @default(now())
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relations
+  lesson            Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, lessonId])
+}
+
+model LessonViewOverride {
+  id                 String   @id @default(uuid())
+  lessonId           String
+  studentId          String
+  extraViewsGranted  Int      @default(0)
+  grantedByUserId    String
+  grantedByRole      String   // TEACHER, ASSISTANT, ADMIN
+  reason             String?
+  createdAt          DateTime @default(now())
+
+  // Relations
+  lesson             Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@unique([lessonId, studentId])
+}

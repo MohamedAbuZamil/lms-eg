@@ -1,0 +1,267 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Enums
+enum QuestionType {
+  MULTIPLE_CHOICE
+  TRUE_FALSE
+  ESSAY
+}
+
+enum Difficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
+enum AssessmentType {
+  QUIZ
+  EXAM
+  ASSIGNMENT
+}
+
+enum AnswerReviewMode {
+  IMMEDIATELY_AFTER_SUBMISSION
+  AFTER_ASSESSMENT_END
+  AT_CUSTOM_TIME
+  NEVER
+}
+
+enum AttemptStatus {
+  STARTED
+  IN_PROGRESS
+  SUBMITTED
+  PARTIALLY_GRADED
+  GRADED
+  EXPIRED
+  SUBMITTED_AUTOMATICALLY
+}
+
+enum QuestionBankScope {
+  GRADE
+  GLOBAL
+}
+
+// Models
+model QuestionBank {
+  id           String            @id @default(cuid())
+  name         String
+  scopeType    QuestionBankScope
+  gradeId      String?           // nullable for GLOBAL scope
+  createdByUserId String
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  // Relations
+  questions    Question[]
+  createdBy    User              @relation("QuestionBankCreator", fields: [createdByUserId], references: [id])
+  grade        Grade?            @relation(fields: [gradeId], references: [id])
+
+  @@map("question_banks")
+}
+
+model Question {
+  id              String        @id @default(cuid())
+  bankId          String
+  type            QuestionType
+  title           String
+  body            String
+  difficulty      Difficulty
+  defaultPoints   Int
+  explanation     String?
+  createdByUserId String
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  // Relations
+  bank            QuestionBank  @relation(fields: [bankId], references: [id], onDelete: Cascade)
+  options         QuestionOption[]
+  assessmentQuestions AssessmentQuestion[]
+  attemptAnswers  AttemptAnswer[]
+  createdBy       User          @relation("QuestionCreator", fields: [createdByUserId], references: [id])
+
+  @@map("questions")
+}
+
+model QuestionOption {
+  id         String @id @default(cuid())
+  questionId String
+  text       String
+  isCorrect  Boolean @default(false)
+  order      Int
+
+  // Relations
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  attemptAnswers AttemptAnswer[]
+
+  @@map("question_options")
+}
+
+model Assessment {
+  id                   String            @id @default(cuid())
+  courseId             String
+  title                String
+  description          String?
+  type                 AssessmentType
+  gradeId              String?
+  availableFrom        DateTime
+  availableTo          DateTime
+  durationMinutes      Int?              // null for no time limit
+  maxAttempts          Int?              // null for unlimited attempts
+  shuffleQuestions     Boolean           @default(false)
+  shuffleOptions       Boolean           @default(false)
+  randomizeQuestions   Boolean           @default(false)
+  randomQuestionCount  Int?              // number of questions to randomly select
+  answerReviewMode     AnswerReviewMode
+  answerReviewAt       DateTime?         // required when mode = AT_CUSTOM_TIME
+  totalPoints          Int               // auto-calculated
+  passPercentage       Float             @default(70.0)
+  isPublished          Boolean           @default(false)
+  createdByUserId      String
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+
+  // Relations
+  course               Course            @relation(fields: [courseId], references: [id])
+  grade                Grade?            @relation(fields: [gradeId], references: [id])
+  questions            AssessmentQuestion[]
+  attempts             Attempt[]
+  gates                AssessmentGate[]
+  createdBy            User              @relation("AssessmentCreator", fields: [createdByUserId], references: [id])
+
+  @@map("assessments")
+}
+
+model AssessmentQuestion {
+  id             String  @id @default(cuid())
+  assessmentId   String
+  questionId     String
+  order          Int
+  pointsOverride Int?    // override default question points
+
+  // Relations
+  assessment     Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  question       Question   @relation(fields: [questionId], references: [id])
+  attempts       AttemptAnswer[]
+
+  @@map("assessment_questions")
+}
+
+model Attempt {
+  id                String        @id @default(cuid())
+  assessmentId      String
+  studentId         String
+  startedAt         DateTime      @default(now())
+  lastSavedAt       DateTime?     // last time student saved progress
+  submittedAt       DateTime?
+  expiresAt         DateTime?     // computed: startedAt + durationMinutes
+  status            AttemptStatus @default(STARTED)
+  score             Float?        // final score after grading
+  maxScore          Float?        // total possible score
+  percentage        Float?        // score percentage
+  isPassed          Boolean?      // calculated after grading
+  
+  // For shuffle/randomization - store the generated order
+  selectedQuestionIds String[]    // IDs of questions selected for this attempt (if randomized)
+  questionOrder       Json?         // Map of questionId -> displayOrder
+  optionsOrder        Json?         // Map of questionId -> shuffled option IDs
+  
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+
+  // Relations
+  assessment          Assessment    @relation(fields: [assessmentId], references: [id])
+  student             User          @relation("StudentAttempts", fields: [studentId], references: [id])
+  answers             AttemptAnswer[]
+
+  @@map("attempts")
+}
+
+model AttemptAnswer {
+  id               String   @id @default(cuid())
+  attemptId        String
+  questionId       String
+  assessmentQuestionId String? // Link to AssessmentQuestion for attempts relation
+  selectedOptionId String? // for MCQ
+  booleanAnswer    Boolean? // for TRUE_FALSE
+  essayText        String? // for ESSAY
+  essayImageUrl    String? // for ESSAY image upload
+  
+  // Draft/save tracking
+  isDraft          Boolean  @default(false) // true if saved but not submitted
+  answeredAt       DateTime @default(now())
+  lastEditedAt     DateTime @updatedAt
+  
+  // Grading
+  isCorrect        Boolean? // null for ungraded essays
+  awardedPoints    Float?   // null for ungraded essays
+  gradedByUserId   String?  // null for auto-graded or ungraded
+  gradedAt         DateTime?
+  feedback         String?  // grader feedback
+
+  // Relations
+  attempt          Attempt  @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  question         Question @relation(fields: [questionId], references: [id])
+  assessmentQuestion AssessmentQuestion? @relation(fields: [assessmentQuestionId], references: [id])
+  selectedOption   QuestionOption? @relation(fields: [selectedOptionId], references: [id])
+  gradedBy         User?    @relation("EssayGrader", fields: [gradedByUserId], references: [id])
+
+  @@unique([attemptId, questionId])
+  @@map("attempt_answers")
+}
+
+model AssessmentGate {
+  id                    String  @id @default(cuid())
+  assessmentId          String
+  targetLessonId        String
+  minimumPassPercentage Float   @default(70.0)
+  createdAt             DateTime @default(now())
+
+  // Relations
+  assessment            Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+
+  @@unique([targetLessonId])
+  @@map("assessment_gates")
+}
+
+// Integration models (references to other services)
+model User {
+  id    String @id @default(cuid())
+  email String @unique
+  role  String
+  // Additional fields would be in Identity Service
+  
+  // Relations
+  createdQuestionBanks QuestionBank[] @relation("QuestionBankCreator")
+  createdQuestions     Question[]     @relation("QuestionCreator")
+  createdAssessments   Assessment[]   @relation("AssessmentCreator")
+  studentAttempts      Attempt[]      @relation("StudentAttempts")
+  gradedAnswers        AttemptAnswer[] @relation("EssayGrader")
+}
+
+model Course {
+  id      String @id @default(cuid())
+  title   String
+  gradeId String?
+  
+  // Relations
+  assessments Assessment[]
+}
+
+model Grade {
+  id   String @id @default(cuid())
+  name String @unique
+  
+  // Relations
+  questionBanks QuestionBank[]
+  assessments   Assessment[]
+}

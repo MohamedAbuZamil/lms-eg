@@ -1,0 +1,93 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum LessonStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum CourseStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum ActivityType {
+  LESSON_OPENED
+  VIDEO_PROGRESS_UPDATED
+  LESSON_COMPLETED
+  COURSE_COMPLETED
+  PROGRESS_RESET
+}
+
+model LessonProgress {
+  id                   String       @id @default(uuid())
+  userId               String
+  courseId             String
+  lessonId             String
+  lessonType           String       // VIDEO, TEXT, PDF, FILE
+  status               LessonStatus @default(NOT_STARTED)
+  progressPercent      Int          @default(0)
+  lastPositionSeconds  Int?         // For video lessons
+  completedAt          DateTime?
+  lastAccessedAt       DateTime     @default(now())
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
+
+  // Relations
+  learningActivities   LearningActivity[]
+
+  @@unique([userId, lessonId])
+  @@index([userId, courseId])
+  @@index([courseId, status])
+}
+
+model CourseProgress {
+  id                 String       @id @default(uuid())
+  userId             String
+  courseId           String
+  totalLessons       Int          @default(0)
+  completedLessons    Int          @default(0)
+  progressPercent    Int          @default(0)
+  status             CourseStatus @default(NOT_STARTED)
+  startedAt          DateTime?
+  completedAt        DateTime?
+  lastActivityAt     DateTime     @default(now())
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  // Relations
+  learningActivities LearningActivity[]
+
+  @@unique([userId, courseId])
+  @@index([courseId, status])
+  @@index([userId, status])
+}
+
+model LearningActivity {
+  id          String       @id @default(uuid())
+  userId      String
+  courseId    String
+  lessonId    String?
+  activityType ActivityType
+  metadata    Json?        // Additional activity data
+  createdAt   DateTime     @default(now())
+
+  // Relations
+  lessonProgress  LessonProgress?  @relation(fields: [lessonId, userId], references: [lessonId, userId], onDelete: SetNull)
+  courseProgress  CourseProgress   @relation(fields: [courseId, userId], references: [courseId, userId], onDelete: SetNull)
+
+  @@index([userId, courseId])
+  @@index([activityType])
+  @@index([createdAt])
+}

@@ -1,0 +1,174 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum NotificationType {
+  COURSE_PURCHASED
+  COURSE_ENROLLED
+  LESSON_UNLOCKED
+  ASSESSMENT_PUBLISHED
+  ASSESSMENT_GRADED
+  ASSIGNMENT_FEEDBACK
+  PAYMENT_RECORDED
+  ANNOUNCEMENT
+  SYSTEM_MESSAGE
+  REMINDER
+}
+
+enum NotificationChannel {
+  IN_APP
+  EMAIL
+  PUSH
+}
+
+enum DeliveryStatus {
+  PENDING
+  SENT
+  FAILED
+  RETRYING
+}
+
+enum TargetRole {
+  ALL
+  STUDENT
+  TEACHER
+  ADMIN
+  ASSISTANT
+}
+
+model Notification {
+  id          String           @id @default(uuid())
+  userId      String
+  title       String
+  body        String
+  type        NotificationType
+  entityType  String?          // e.g., "course", "assessment", "lesson"
+  entityId    String?          // ID of the related entity
+  isRead      Boolean          @default(false)
+  readAt      DateTime?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  // Relations
+  deliveries  NotificationDelivery[]
+
+  @@index([userId, isRead, createdAt])
+  @@index([userId, createdAt])
+  @@index([type])
+  @@index([entityType, entityId])
+  @@map("notifications")
+}
+
+model NotificationDelivery {
+  id              String              @id @default(uuid())
+  notificationId  String
+  channel         NotificationChannel
+  status          DeliveryStatus      @default(PENDING)
+  attempts        Int                 @default(0)
+  lastError       String?
+  sentAt          DateTime?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  // Relations
+  notification Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+
+  @@index([notificationId])
+  @@index([status, attempts])
+  @@index([createdAt])
+  @@map("notification_deliveries")
+}
+
+model NotificationPreference {
+  id               String   @id @default(uuid())
+  userId           String   @unique
+  emailEnabled     Boolean  @default(true)
+  pushEnabled      Boolean  @default(true)
+  inAppEnabled     Boolean  @default(true)
+  marketingEnabled Boolean  @default(true)
+  
+  // Type-specific preferences (JSON for flexibility)
+  typePreferences  Json?    // { "ASSESSMENT_PUBLISHED": { "email": true, "push": false } }
+  
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([userId])
+  @@map("notification_preferences")
+}
+
+model SystemAnnouncement {
+  id             String     @id @default(uuid())
+  title          String
+  message        String
+  targetRole     TargetRole @default(ALL)
+  targetCourseId String?    // If set, only for enrolled students
+  
+  // Scheduling
+  publishAt      DateTime
+  expireAt       DateTime?
+  isPublished    Boolean    @default(false)
+  
+  // Tracking
+  createdBy      String     // Admin user ID
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  
+  // Processing status
+  processingStatus String   @default("PENDING") // PENDING, PROCESSING, COMPLETED, FAILED
+  processedCount   Int      @default(0)
+  totalTargetCount Int      @default(0)
+
+  @@index([targetRole])
+  @@index([targetCourseId])
+  @@index([publishAt, isPublished])
+  @@index([processingStatus])
+  @@map("system_announcements")
+}
+
+model BulkNotificationJob {
+  id              String   @id @default(uuid())
+  announcementId  String?
+  courseId        String?
+  teacherId       String?
+  
+  // Processing state
+  status          String   @default("PENDING") // PENDING, PROCESSING, COMPLETED, FAILED
+  totalCount      Int      @default(0)
+  processedCount  Int      @default(0)
+  failedCount     Int      @default(0)
+  
+  // Cursor for resumable processing
+  lastProcessedId String?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  completedAt     DateTime?
+  errorMessage    String?
+
+  @@index([status])
+  @@index([announcementId])
+  @@index([courseId])
+  @@map("bulk_notification_jobs")
+}
+
+// For rate limiting and deduplication
+model NotificationLog {
+  id          String   @id @default(uuid())
+  userId      String
+  type        NotificationType
+  entityType  String?
+  entityId    String?
+  channel     NotificationChannel
+  sentAt      DateTime @default(now())
+  
+  @@unique([userId, type, entityType, entityId, channel])
+  @@index([userId, sentAt])
+  @@index([type, sentAt])
+  @@map("notification_logs")
+}

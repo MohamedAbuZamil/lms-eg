@@ -17,10 +17,19 @@ The LMS follows a microservices architecture pattern where each service has a sp
     ┌─────┴─────┐          ┌─────┴─────┐          ┌─────┴─────┐
     │ Identity     │          │ Course      │          │ Enrollment   │
     │ Service      │          │ Service     │          │ Service     │
-    │ (Port 3001) │          │ (Port 3002) │          │ (Future)    │
+    │ (Port 3001) │          │ (Port 3002) │          │ (Port 3003) │
     │              │          │              │              │
     │ PostgreSQL   │          │ PostgreSQL   │          │ PostgreSQL   │
-    │ (Port 5433) │          │ (Port 5435) │          │ (Future)    │
+    │ (Port 5433) │          │ (Port 5435) │          │ (Port 5436) │
+    └──────────────┘          └──────────────┘          └──────────────┘
+          │                      │                        │
+    ┌─────┴─────┐          ┌─────┴─────┐          ┌─────┴─────┐
+    │ Staff        │          │ Content     │          │ Redis        │
+    │ Service      │          │ Service     │          │ Cache        │
+    │ (Port 3004) │          │ (Port 3005) │          │ (Port 6379) │
+    │              │          │              │              │
+    │ PostgreSQL   │          │ PostgreSQL   │              │
+    │ (Port 5437) │          │ (Port 5438) │              │
     └──────────────┘          └──────────────┘          └──────────────┘
           │                      │                        │
           └────────────────────────┴────────────────┘
@@ -56,9 +65,9 @@ The LMS follows a microservices architecture pattern where each service has a sp
 
 **Responsibilities:**
 - Course creation and management
+- Grade management and academic structure
 - Teacher ownership enforcement
 - Course catalog and search
-- Public course access
 
 **Key Features:**
 - JWT authentication integration
@@ -66,31 +75,76 @@ The LMS follows a microservices architecture pattern where each service has a sp
 - Unique course titles per teacher
 - Input validation and sanitization
 
+#### 3. Enrollment Service (`services/enrollment-service`)
+**Port:** 3003 | **Database:** PostgreSQL (5436)
+
+**Responsibilities:**
+- Student self-enrollment in courses
+- Teacher enrollment management
+- Assistant enrollment authorization
+- Enrollment status tracking (ACTIVE, BLOCKED, REMOVED)
+
+**Key Features:**
+- Cross-service course verification
+- Teacher ownership validation
+- Assistant permission checking
+- Actor tracking for all enrollment actions
+
+#### 4. Staff Service (`services/staff-service`)
+**Port:** 3004 | **Database:** PostgreSQL (5437)
+
+**Responsibilities:**
+- Teacher-assistant relationship management
+- Assistant permission configuration
+- Staff assignment and tracking
+- Teaching team coordination
+
+**Key Features:**
+- Permission-based access control
+- Teacher ownership enforcement
+- Assistant role management
+- Staff status tracking
+
+#### 5. Content Service (`services/content-service`)
+**Port:** 3005 | **Database:** PostgreSQL (5438)
+
+**Responsibilities:**
+- Course content structure management (sections & lessons)
+- Secure video playback and external provider integration
+- Content access control and preview functionality
+- Lesson content organization and sequencing
+- Cross-service content validation
+
+**Key Features:**
+- Flexible content types (VIDEO, TEXT, PDF, FILE)
+- **🔒 Secure Video Playback** - External provider integration with protection
+- Preview lessons for public access
+- Enrollment-based content access
+- Teacher ownership and assistant authorization
+- Content ordering and hierarchy management
+- **Short-lived playback tokens** (2-minute expiry)
+- **URL sanitization** - Raw provider URLs never exposed
+- **Multiple protection levels** (Basic, Tokenized, Signed, Embed-only)
+
 ### 🔄 Future Services (Planned)
 
-#### 3. Enrollment Service
-**Responsibilities:**
-- Student course enrollment
-- Enrollment status tracking
-- Waitlist management
-
-#### 4. Lesson Service
-**Responsibilities:**
-- Lesson content management
-- Video and material hosting
-- Lesson sequencing
-
-#### 5. Progress Service
+#### 6. Progress Service
 **Responsibilities:**
 - Student progress tracking
 - Completion tracking
 - Performance analytics
 
-#### 6. Payment Service
+#### 7. Payment Service
 **Responsibilities:**
 - Payment processing
 - Subscription management
 - Revenue tracking
+
+#### 8. Notification Service
+**Responsibilities:**
+- Email notifications
+- Push notifications
+- System alerts
 
 ## 🛠️ Technology Stack
 
@@ -140,10 +194,51 @@ lms/
 │   │   │   └── 📄 login.dto.ts
 │   │   ├── 📁 test/
 │   │   └── 📄 package.json
-│   └── 📁 course-service/          # Course management
+│   ├── 📁 course-service/          # Course management
+│   │   ├── 📁 src/
+│   │   │   ├── 📄 course.controller.ts
+│   │   │   ├── � course.service.ts
+│   │   │   ├── 📄 app.module.ts
+│   │   │   ├── 📄 main.ts
+│   │   │   ├── 📄 prisma.service.ts
+│   │   │   ├── � auth/
+│   │   │   │   ├── 📄 jwt-auth.guard.ts
+│   │   │   │   ├── 📄 roles.guard.ts
+│   │   │   │   ├── 📄 roles.decorator.ts
+│   │   │   │   └── 📁 decorators/
+│   │   │   │       └── 📄 current-user.decorator.ts
+│   │   │   ├── 📁 dto/
+│   │   │   │   └── 📄 create-course.dto.ts
+│   │   │   └── 📁 test/
+│   │   ├── � prisma/
+│   │   │   └── � schema.prisma
+│   │   └── 📄 package.json
+│   ├── 📁 enrollment-service/       # Course enrollment management
+│   │   ├── 📁 src/
+│   │   │   ├── 📄 enrollment.controller.ts
+│   │   │   ├── 📄 enrollment.service.ts
+│   │   │   ├── 📄 course-client.service.ts
+│   │   │   ├── 📄 staff-client.service.ts
+│   │   │   ├── 📄 app.module.ts
+│   │   │   ├── 📄 main.ts
+│   │   │   ├── 📄 prisma.service.ts
+│   │   │   ├── 📁 auth/
+│   │   │   │   ├── 📄 jwt-auth.guard.ts
+│   │   │   │   ├── 📄 roles.guard.ts
+│   │   │   │   ├── 📄 roles.decorator.ts
+│   │   │   │   └── 📁 decorators/
+│   │   │   │       └── 📄 current-user.decorator.ts
+│   │   │   └── 📁 dto/
+│   │   │       ├── 📄 create-self-enrollment.dto.ts
+│   │   │       ├── 📄 create-enrollment.dto.ts
+│   │   │       └── 📄 block-enrollment.dto.ts
+│   │   ├── 📁 prisma/
+│   │   │   └── 📄 schema.prisma
+│   │   └── 📄 package.json
+│   └── 📁 staff-service/            # Teacher staff management
 │       ├── 📁 src/
-│       │   ├── 📄 course.controller.ts
-│       │   ├── 📄 course.service.ts
+│       │   ├── 📄 staff.controller.ts
+│       │   ├── 📄 staff.service.ts
 │       │   ├── 📄 app.module.ts
 │       │   ├── 📄 main.ts
 │       │   ├── 📄 prisma.service.ts
@@ -153,12 +248,36 @@ lms/
 │       │   │   ├── 📄 roles.decorator.ts
 │       │   │   └── 📁 decorators/
 │       │   │       └── 📄 current-user.decorator.ts
-│       │   ├── 📁 dto/
-│       │   │   └── 📄 create-course.dto.ts
-│       │   └── 📁 test/
+│       │   └── 📁 dto/
+│       │       ├── 📄 create-staff.dto.ts
+│       │       └── 📄 update-staff.dto.ts
 │       ├── 📁 prisma/
 │       │   └── 📄 schema.prisma
 │       └── 📄 package.json
+└── 📁 content-service/            # Course content management
+    ├── 📁 src/
+    │   ├── 📄 content.controller.ts
+    │   ├── 📄 content.service.ts
+    │   ├── 📄 app.module.ts
+    │   ├── 📄 main.ts
+    │   ├── 📄 prisma.service.ts
+    │   ├── 📄 course-client.service.ts
+    │   ├── 📄 staff-client.service.ts
+    │   ├── 📄 enrollment-client.service.ts
+    │   ├── 📁 auth/
+    │   │   ├── 📄 jwt-auth.guard.ts
+    │   │   ├── 📄 roles.guard.ts
+    │   │   ├── 📄 roles.decorator.ts
+    │   │   └── 📁 decorators/
+    │   │       └── 📄 current-user.decorator.ts
+    │   └── � dto/
+    │       ├── �📄 create-section.dto.ts
+    │       ├── 📄 update-section.dto.ts
+    │       ├── 📄 create-lesson.dto.ts
+    │       └── 📄 update-lesson.dto.ts
+    ├── 📁 prisma/
+    │   └── 📄 schema.prisma
+    └── 📄 package.json
 ├── 📄 README.md                     # This file
 └── 📄 .gitignore
 ```
@@ -192,6 +311,9 @@ docker compose -f infra/docker-compose.yml ps
 **Services Started:**
 - PostgreSQL Identity: `localhost:5433`
 - PostgreSQL Course: `localhost:5435`
+- PostgreSQL Staff: `localhost:5437`
+- PostgreSQL Enrollment: `localhost:5436`
+- PostgreSQL Content: `localhost:5438`
 - NATS Message Queue: `localhost:4222`
 - Redis Cache: `localhost:6379`
 
@@ -241,7 +363,53 @@ npm run start:dev
 
 **Course Service:** `http://localhost:3002`
 
-### 5. Verify Setup
+### 5. Setup Staff Service
+
+```bash
+cd services/staff-service
+
+# Create environment file
+cp env.example .env
+
+# Install dependencies
+npm install
+
+# Run database migrations
+npx prisma migrate dev --name init
+
+# Generate Prisma client
+npx prisma generate
+
+# Start development server
+npm run start:dev
+```
+
+**Staff Service:** `http://localhost:3004`
+
+### 6. Setup Enrollment Service
+
+```bash
+cd services/enrollment-service
+
+# Create environment file
+cp env.example .env
+
+# Install dependencies
+npm install
+
+# Run database migrations
+npx prisma migrate dev --name init
+
+# Generate Prisma client
+npx prisma generate
+
+# Start development server
+npm run start:dev
+```
+
+**Enrollment Service:** `http://localhost:3003`
+
+### 7. Verify Setup
 
 ```bash
 # Check identity service health
@@ -249,6 +417,15 @@ curl http://localhost:3001/health
 
 # Check course service health
 curl http://localhost:3002/health
+
+# Check staff service health
+curl http://localhost:3004/health
+
+# Check enrollment service health
+curl http://localhost:3003/health
+
+# Check content service health
+curl http://localhost:3005/health
 
 # Expected response: {"status": "ok"}
 ```
@@ -282,6 +459,60 @@ JWT_EXPIRES_IN="15m"
 
 # Server Configuration
 PORT=3002
+NODE_ENV="development"
+```
+
+### Staff Service Environment
+
+```env
+# Database
+DATABASE_URL="postgresql://lms:lms@localhost:5437/staff_db?schema=public"
+
+# JWT Configuration
+JWT_SECRET="your-super-secret-jwt-key-change-in-production"
+JWT_EXPIRES_IN="15m"
+
+# Server Configuration
+PORT=3004
+NODE_ENV="development"
+```
+
+### Enrollment Service Environment
+
+```env
+# Database
+DATABASE_URL="postgresql://lms:lms@localhost:5436/enrollment_db?schema=public"
+
+# JWT Configuration
+JWT_SECRET="your-super-secret-jwt-key-change-in-production"
+JWT_EXPIRES_IN="15m"
+
+# Service URLs
+COURSE_SERVICE_URL="http://localhost:3002"
+STAFF_SERVICE_URL="http://localhost:3004"
+
+# Server Configuration
+PORT=3003
+NODE_ENV="development"
+```
+
+### Content Service Environment
+
+```env
+# Database
+DATABASE_URL="postgresql://lms:lms@localhost:5438/content_db?schema=public"
+
+# JWT Configuration
+JWT_SECRET="your-super-secret-jwt-key-change-in-production"
+JWT_EXPIRES_IN="15m"
+
+# Service URLs
+COURSE_SERVICE_URL="http://localhost:3002"
+STAFF_SERVICE_URL="http://localhost:3004"
+ENROLLMENT_SERVICE_URL="http://localhost:3003"
+
+# Server Configuration
+PORT=3005
 NODE_ENV="development"
 ```
 
@@ -339,6 +570,7 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 | POST | `/auth/register` | Register new user | ❌ |
 | POST | `/auth/login` | Login and get JWT | ❌ |
 | GET | `/auth/me` | Get user profile | ✅ |
+| GET | `/health` | Service health check | ❌ |
 
 ### Course Service Endpoints
 
@@ -348,18 +580,101 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 | POST | `/courses` | Create new course | ✅ | TEACHER |
 | GET | `/courses` | List all courses | ❌ | - |
 | GET | `/courses/:id` | Get course by ID | ❌ | - |
+| PATCH | `/courses/:id` | Update course | ✅ | TEACHER (owner) |
+| DELETE | `/courses/:id` | Delete course | ✅ | TEACHER (owner) |
+| GET | `/teachers/me/courses` | Get teacher's courses | ✅ | TEACHER |
+
+### Staff Service Endpoints
+
+| Method | Endpoint | Description | Auth Required | Role Required |
+|---------|-----------|-------------|---------------|---------------|
+| GET | `/health` | Service health check | ❌ | - |
+| POST | `/staff` | Assign assistant to teacher | ✅ | TEACHER/ADMIN |
+| GET | `/teachers/me/staff` | Get teacher's staff list | ✅ | TEACHER |
+| GET | `/staff/:id` | Get staff details | ✅ | TEACHER/ADMIN |
+| PATCH | `/staff/:id` | Update staff permissions | ✅ | TEACHER (owner) |
+| DELETE | `/staff/:id` | Remove staff assignment | ✅ | TEACHER (owner) |
+| GET | `/assistants/me/teachers` | Get assistant's teachers | ✅ | STUDENT/TEACHER/ADMIN |
+
+### Enrollment Service Endpoints
+
+| Method | Endpoint | Description | Auth Required | Role Required |
+|---------|-----------|-------------|---------------|---------------|
+| GET | `/health` | Service health check | ❌ | - |
+| POST | `/enrollments/self` | Student self-enrollment | ✅ | STUDENT |
+| POST | `/enrollments` | Enroll student in course | ✅ | TEACHER/ADMIN |
+| GET | `/students/me/enrollments` | Get student's enrollments | ✅ | STUDENT |
+| GET | `/students/me/courses` | Get student's courses | ✅ | STUDENT |
+| PATCH | `/enrollments/:id/block` | Block enrollment | ✅ | TEACHER/ADMIN |
+| DELETE | `/enrollments/:id` | Remove enrollment | ✅ | TEACHER/ADMIN |
+
+### Content Service Endpoints
+
+| Method | Endpoint | Description | Auth Required | Role Required |
+|---------|-----------|-------------|---------------|---------------|
+| GET | `/health` | Service health check | ❌ | - |
+| POST | `/courses/:courseId/sections` | Create section | ✅ | TEACHER/ADMIN |
+| GET | `/courses/:courseId/content` | Get course content | ❌/✅ | - |
+| PATCH | `/sections/:id` | Update section | ✅ | TEACHER/ADMIN |
+| DELETE | `/sections/:id` | Delete section | ✅ | TEACHER/ADMIN |
+| POST | `/sections/:sectionId/lessons` | Create lesson | ✅ | TEACHER/ADMIN |
+| GET | `/lessons/:id` | Get lesson details | ❌/✅ | - |
+| PATCH | `/lessons/:id` | Update lesson | ✅ | TEACHER/ADMIN |
+| DELETE | `/lessons/:id` | Delete lesson | ✅ | TEACHER/ADMIN |
+| GET | `/lessons/:id/playback` | Generate secure playback token | ❌/✅ | - |
+| GET | `/playback/resolve` | Resolve playback token | ❌ | - |
+
+#### **🔒 Secure Video Playback Features**
+
+The Content Service now includes enterprise-grade video security:
+
+- **External Video Providers**: YouTube, Vimeo, MUX, Bunny, Google Drive, Custom
+- **Protected Playback**: Short-lived JWT tokens (2-minute expiry)
+- **Access Control**: Preview lessons (public) vs enrolled content (protected)
+- **URL Sanitization**: Raw provider URLs never exposed in standard APIs
+- **Multiple Protection Levels**: Basic, Tokenized, Signed, Embed-only
+- **Access Logging**: Complete audit trail for compliance
+
+**Video Lesson Creation:**
+```bash
+# Create secure video lesson
+curl -X POST http://localhost:3005/sections/section-uuid/lessons \
+  -H "Authorization: Bearer $TEACHER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Introduction to Variables",
+    "type": "VIDEO",
+    "videoProvider": "YOUTUBE",
+    "providerVideoId": "dQw4w9WgXcQ",
+    "playbackProtection": "TOKENIZED",
+    "allowDownload": false
+  }'
+```
+
+**Secure Playback Access:**
+```bash
+# Get playback token (for enrolled students)
+curl -X GET http://localhost:3005/lessons/lesson-uuid/playback \
+  -H "Authorization: Bearer $STUDENT_TOKEN"
+
+# Public preview access (no auth required)
+curl -X GET http://localhost:3005/lessons/preview-lesson-uuid/playback
+
+# Resolve token to get embed information
+curl -X GET "http://localhost:3005/playback/resolve?token=eyJ..."
+```
 
 ## 🧪 Testing Guide
 
 ### Prerequisites
 
-1. Both services running (`localhost:3001`, `localhost:3002`)
-2. Databases initialized with migrations
+1. All services running (`localhost:3001`, `localhost:3002`, `localhost:3003`, `localhost:3004`, `localhost:3005`)
+2. All databases initialized with migrations
 3. Test user accounts created
 
 ### Test Scenarios
 
-#### 1. Complete User Registration & Course Creation
+#### 1. Complete User Registration & Course Enrollment Flow
 
 ```bash
 # Step 1: Register Teacher
@@ -373,7 +688,18 @@ curl -X POST http://localhost:3001/auth/register \
     "role": "TEACHER"
   }'
 
-# Step 2: Login Teacher
+# Step 2: Register Student
+curl -X POST http://localhost:3001/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "student@example.com",
+    "mobile": "+1234567891",
+    "password": "password123",
+    "name": "Test Student",
+    "role": "STUDENT"
+  }'
+
+# Step 3: Login Teacher
 curl -X POST http://localhost:3001/auth/login \
   -H "Content-Type: application/json" \
   -d '{
@@ -381,7 +707,7 @@ curl -X POST http://localhost:3001/auth/login \
     "password": "password123"
   }'
 
-# Step 3: Create Course (use token from step 2)
+# Step 4: Create Course (use token from step 3)
 curl -X POST http://localhost:3002/courses \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer TEACHER_JWT_TOKEN" \
@@ -390,9 +716,63 @@ curl -X POST http://localhost:3002/courses \
     "description": "Learn programming fundamentals",
     "price": 99
   }'
+
+# Step 5: Student Self-Enroll
+curl -X POST http://localhost:3003/enrollments/self \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer STUDENT_JWT_TOKEN" \
+  -d '{
+    "courseId": "COURSE_ID_FROM_STEP_4"
+  }'
+
+# Step 6: View Student Enrollments
+curl -X GET http://localhost:3003/students/me/enrollments \
+  -H "Authorization: Bearer STUDENT_JWT_TOKEN"
+
+# Step 7: View Student Courses
+curl -X GET http://localhost:3003/students/me/courses \
+  -H "Authorization: Bearer STUDENT_JWT_TOKEN"
 ```
 
-#### 2. Authorization & Role Testing
+#### 2. Staff Management Testing
+
+```bash
+# Step 1: Register Assistant
+curl -X POST http://localhost:3001/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "assistant@example.com",
+    "mobile": "+1234567892",
+    "password": "password123",
+    "name": "Test Assistant",
+    "role": "STUDENT"
+  }'
+
+# Step 2: Teacher Assigns Assistant
+curl -X POST http://localhost:3004/staff \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer TEACHER_JWT_TOKEN" \
+  -d '{
+    "assistantUserId": "ASSISTANT_USER_ID",
+    "canManageCourses": true,
+    "canManageEnrollments": true
+  }'
+
+# Step 3: Assistant Views Teachers
+curl -X GET http://localhost:3004/assistants/me/teachers \
+  -H "Authorization: Bearer ASSISTANT_JWT_TOKEN"
+
+# Step 4: Assistant Enrolls Student (if canManageEnrollments = true)
+curl -X POST http://localhost:3003/enrollments \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer ASSISTANT_JWT_TOKEN" \
+  -d '{
+    "studentId": "STUDENT_USER_ID",
+    "courseId": "COURSE_ID"
+  }'
+```
+
+#### 3. Authorization & Role Testing
 
 ```bash
 # Test: Create course without token (should fail - 401)
@@ -407,7 +787,7 @@ curl -X POST http://localhost:3002/courses \
   -d '{"title": "Test Course", "price": 99}'
 ```
 
-#### 3. Data Validation Testing
+#### 4. Data Validation Testing
 
 ```bash
 # Test: Missing required fields
@@ -434,6 +814,14 @@ npm run test
 cd services/course-service
 npm run test
 
+# Run all tests for staff service
+cd services/staff-service
+npm run test
+
+# Run all tests for enrollment service
+cd services/enrollment-service
+npm run test
+
 # Run tests with coverage
 npm run test:cov
 
@@ -451,7 +839,9 @@ docker compose -f infra/docker-compose.yml up -d
 
 # Start services in development mode
 cd services/identity-service && npm run start:dev &
-cd services/course-service && npm run start:dev
+cd services/course-service && npm run start:dev &
+cd services/staff-service && npm run start:dev &
+cd services/enrollment-service && npm run start:dev
 ```
 
 ### Production Environment
@@ -498,6 +888,44 @@ services:
     depends_on:
       - postgres-course
 
+  staff-service:
+    build: ./services/staff-service
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=${STAFF_DB_URL}
+      - JWT_SECRET=${JWT_SECRET}
+    ports:
+      - "3004:3004"
+    depends_on:
+      - postgres-staff
+
+  enrollment-service:
+    build: ./services/enrollment-service
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=${ENROLLMENT_DB_URL}
+      - JWT_SECRET=${JWT_SECRET}
+      - COURSE_SERVICE_URL=http://course-service:3002
+      - STAFF_SERVICE_URL=http://staff-service:3004
+    ports:
+      - "3003:3003"
+    depends_on:
+      - postgres-enrollment
+
+  content-service:
+    build: ./services/content-service
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=${CONTENT_DB_URL}
+      - JWT_SECRET=${JWT_SECRET}
+      - COURSE_SERVICE_URL=http://course-service:3002
+      - STAFF_SERVICE_URL=http://staff-service:3004
+      - ENROLLMENT_SERVICE_URL=http://enrollment-service:3003
+    ports:
+      - "3005:3005"
+    depends_on:
+      - postgres-content
+
   postgres-identity:
     image: postgres:16
     environment:
@@ -515,6 +943,40 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD}
     volumes:
       - postgres_course_data:/var/lib/postgresql/data
+
+  postgres-staff:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: lms_staff
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres_staff_data:/var/lib/postgresql/data
+
+  postgres-enrollment:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: lms_enrollment
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres_enrollment_data:/var/lib/postgresql/data
+
+  postgres-content:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: lms_content
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres_content_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_identity_data:
+  postgres_course_data:
+  postgres_staff_data:
+  postgres_enrollment_data:
+  postgres_content_data:
 ```
 
 #### Kubernetes Deployment
@@ -609,6 +1071,9 @@ export class MetricsService {
 # Service health endpoints
 curl http://localhost:3001/health  # Identity service
 curl http://localhost:3002/health  # Course service
+curl http://localhost:3003/health  # Enrollment service
+curl http://localhost:3004/health  # Staff service
+curl http://localhost:3005/health  # Content service
 
 # Database health
 npx prisma db pull --schema=./prisma/schema.prisma
@@ -665,7 +1130,7 @@ jobs:
     
     strategy:
       matrix:
-        service: [identity-service, course-service]
+        service: [identity-service, course-service, staff-service, enrollment-service, content-service]
     
     steps:
       - name: Checkout Code
@@ -716,7 +1181,7 @@ jobs:
     
     strategy:
       matrix:
-        service: [identity-service, course-service]
+        service: [identity-service, course-service, staff-service, enrollment-service, content-service]
     
     steps:
       - name: Checkout Code
@@ -759,7 +1224,8 @@ jobs:
 ### Phase 1: Core Services (Current ✅)
 - [x] Identity Service with JWT authentication
 - [x] Course Service with teacher ownership
-- [ ] Enrollment Service
+- [x] Staff Service with assistant management
+- [x] Enrollment Service with student enrollment
 - [ ] Basic frontend integration
 
 ### Phase 2: Enhanced Features
@@ -914,6 +1380,73 @@ For security vulnerabilities, please:
 **Last Updated:** March 2026  
 **Status:** ✅ Production Ready  
 **Maintainers:** LMS Development Team  
+**Total Services:** 5 (Identity, Course, Staff, Enrollment, Content)  
+**Total API Endpoints:** 37  
+**Database Instances:** 5 (PostgreSQL)  
+
+---
+
+## 📊 System Overview
+
+### 🎯 All Services Running:
+```
+┌─────────────────┬──────────┬─────────────────────────────┐
+│ Service         │ Port     │ Status                      │
+├─────────────────┼──────────┼─────────────────────────────┤
+│ Identity Service│ 3001     ✅│ Authentication & Users      │
+│ Course Service  │ 3002     ✅│ Academic Catalog            │
+│ Enrollment Service│ 3003   ✅│ Course Enrollments          │
+│ Staff Service   │ 3004     ✅│ Teacher Staff Management    │
+│ Content Service │ 3005     ✅│ Course Content & Secure Video │
+└─────────────────┴──────────┴─────────────────────────────┘
+```
+
+### 🗄️ All Databases Connected:
+```
+┌─────────────────┬──────────┬─────────────────────────────┐
+│ Database        │ Port     │ Purpose                     │
+├─────────────────┼──────────┼─────────────────────────────┤
+│ Identity DB     │ 5433     ✅│ Users & Authentication      │
+│ Course DB       │ 5435     ✅│ Grades & Courses           │
+│ Enrollment DB   │ 5436     ✅│ Course Enrollments          │
+│ Staff DB        │ 5437     ✅│ Teacher-Assistant Relations │
+│ Content DB      │ 5438     ✅│ Course Content & Lessons    │
+└─────────────────┴──────────┴─────────────────────────────┘
+```
+
+### 🔗 Total API Endpoints:
+- **Identity Service:** 4 endpoints
+- **Course Service:** 8 endpoints  
+- **Staff Service:** 7 endpoints
+- **Enrollment Service:** 7 endpoints
+- **Content Service:** 11 endpoints
+- **Total:** **37 working endpoints**
+
+### ✅ Core Features Implemented:
+1. **User Management** - Registration, login, roles
+2. **Course Management** - Academic catalog with grades
+3. **Staff Management** - Teacher-assistant relationships
+4. **Enrollment Management** - Student course enrollments
+5. **Content Management** - Course structure with sections & lessons
+6. **Secure Video Playback** - External provider integration with protected access
+7. **Authentication** - JWT-based cross-service auth
+8. **Authorization** - Role-based access control
+9. **Database Design** - Proper relations and constraints
+10. **Error Handling** - Comprehensive error responses
+11. **API Documentation** - Complete with examples
+
+### ✅ Business Rules Enforced:
+- **Teacher Ownership** - Teachers can only manage their courses
+- **Assistant Permissions** - Fine-grained permission control
+- **Student Self-Service** - Students can enroll themselves
+- **Enrollment Status** - ACTIVE, BLOCKED, REMOVED tracking
+- **Actor Tracking** - Records who performed each action
+- **Duplicate Prevention** - Unique constraints enforced
+- **Content Access Control** - Preview vs enrolled content
+- **Content Ordering** - Sequential organization enforced
+- **Video URL Protection** - Raw provider URLs never exposed in standard APIs
+- **Secure Playback Tokens** - Short-lived tokens (2 minutes) prevent sharing
+- **Provider Validation** - Supported video providers only (YouTube, Vimeo, etc.)  
 
 ---
 

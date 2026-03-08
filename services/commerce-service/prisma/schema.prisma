@@ -1,0 +1,194 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== ENUMS ====================
+
+enum RechargeCodeStatus {
+  UNUSED
+  REDEEMED
+  EXPIRED
+  CANCELLED
+}
+
+enum TransactionType {
+  RECHARGE_CODE
+  COURSE_PURCHASE
+  MANUAL_ADJUSTMENT
+  REFUND
+}
+
+enum PaymentMethod {
+  TEACHER_RECHARGE_CODE
+  TEACHER_BALANCE
+  MANUAL_CASH
+  MANUAL_TRANSFER
+  FAWRY
+  PAYMOB
+  STRIPE
+}
+
+enum PurchaseStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+// ==================== MODELS ====================
+
+model TeacherWallet {
+  id        String   @id @default(uuid())
+  teacherId String   @unique
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  batches              RechargeCodeBatch[]
+  studentBalances      StudentTeacherBalance[]
+  rechargeCodes        RechargeCode[]
+  balanceTransactions  BalanceTransaction[]
+  coursePurchases      CoursePurchase[]
+  manualPayments       ManualEnrollmentPayment[]
+  
+  @@index([teacherId])
+}
+
+model StudentTeacherBalance {
+  id        String @id @default(uuid())
+  studentId String
+  teacherId String
+  balance   Float  @default(0)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  teacher   TeacherWallet @relation(fields: [teacherId], references: [teacherId])
+  
+  // Transactions for this balance
+  transactions BalanceTransaction[]
+  
+  @@unique([studentId, teacherId])
+  @@index([studentId])
+  @@index([teacherId])
+}
+
+model RechargeCodeBatch {
+  id            String @id @default(uuid())
+  teacherId     String
+  title         String
+  unitAmount    Float
+  quantity      Int
+  createdByUserId String
+  
+  createdAt     DateTime @default(now())
+  
+  // Relations
+  teacher       TeacherWallet @relation(fields: [teacherId], references: [teacherId])
+  codes         RechargeCode[]
+  
+  @@index([teacherId])
+  @@index([createdAt])
+}
+
+model RechargeCode {
+  id                String @id @default(uuid())
+  batchId           String
+  teacherId         String
+  code              String @unique
+  amount            Float
+  status            RechargeCodeStatus @default(UNUSED)
+  
+  redeemedByStudentId String?
+  redeemedAt          DateTime?
+  
+  createdAt         DateTime @default(now())
+  
+  // Relations
+  batch             RechargeCodeBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  teacher           TeacherWallet @relation(fields: [teacherId], references: [teacherId])
+  
+  @@index([code])
+  @@index([batchId])
+  @@index([teacherId])
+  @@index([status])
+  @@index([redeemedByStudentId])
+}
+
+model BalanceTransaction {
+  id            String @id @default(uuid())
+  studentId     String
+  teacherId     String
+  type          TransactionType
+  amount        Float
+  
+  // Reference to the source (recharge code, purchase, etc.)
+  referenceType String? // RECHARGE_CODE, COURSE_PURCHASE, etc.
+  referenceId   String?
+  
+  createdByUserId String?
+  createdAt       DateTime @default(now())
+  
+  // Relations
+  teacher         TeacherWallet @relation(fields: [teacherId], references: [teacherId])
+  studentBalance  StudentTeacherBalance? @relation(fields: [studentId, teacherId], references: [studentId, teacherId])
+  
+  @@index([studentId])
+  @@index([teacherId])
+  @@index([type])
+  @@index([createdAt])
+}
+
+model CoursePurchase {
+  id              String @id @default(uuid())
+  studentId       String
+  courseId        String
+  teacherId       String
+  amountCharged   Float
+  paymentMethod   PaymentMethod
+  status          PurchaseStatus @default(PENDING)
+  
+  // For external payments
+  externalRef     String?
+  
+  createdAt       DateTime @default(now())
+  
+  // Relations
+  teacher         TeacherWallet @relation(fields: [teacherId], references: [teacherId])
+  
+  @@index([studentId])
+  @@index([courseId])
+  @@index([teacherId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model ManualEnrollmentPayment {
+  id              String @id @default(uuid())
+  studentId       String
+  courseId        String
+  teacherId       String
+  assistantId     String?
+  
+  amountPaid      Float
+  paymentMethod   PaymentMethod
+  notes           String?
+  
+  recordedByUserId String
+  createdAt       DateTime @default(now())
+  
+  // Relations
+  teacher         TeacherWallet @relation(fields: [teacherId], references: [teacherId])
+  
+  @@index([studentId])
+  @@index([courseId])
+  @@index([teacherId])
+  @@index([createdAt])
+}
