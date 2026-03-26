@@ -1,0 +1,9 @@
+{
+  "/teacher/(app)/assessments/page": "app/teacher/(app)/assessments/page.js",
+  "/teacher/(app)/courses/[courseId]/page": "app/teacher/(app)/courses/[courseId]/page.js",
+  "/student/courses/page": "app/student/courses/page.js",
+  "/student/page": "app/student/page.js",
+  "/student/courses/[courseId]/page": "app/student/courses/[courseId]/page.js",
+  "/student/courses/[courseId]/exam/[examId]/page": "app/student/courses/[courseId]/exam/[examId]/page.js",
+  "/student/courses/[courseId]/exam/[examId]/answer-key/page": "app/student/courses/[courseId]/exam/[examId]/answer-key/page.js"
+}
