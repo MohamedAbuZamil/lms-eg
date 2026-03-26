@@ -1,0 +1,59 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    name: Deploy to VPS
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script_stop: true
+          script: |
+            set -e
+            cd /home/ubuntu/lms
+
+            echo "==> Pulling latest code..."
+            git pull origin main
+
+            echo "==> Installing & building services..."
+            SERVICES=(
+              identity-service
+              course-service
+              content-service
+              enrollment-service
+              assessment-service
+              progress-service
+              grade-service
+              commerce-service
+              notification-service
+              staff-service
+            )
+
+            for svc in "${SERVICES[@]}"; do
+              echo "--- Building $svc ---"
+              cd services/$svc
+              npm ci --omit=dev
+              npm run build
+              cd ../..
+            done
+
+            echo "==> Installing & building frontend..."
+            cd frontend
+            npm ci
+            npm run build
+            cd ..
+
+            echo "==> Reloading PM2 processes..."
+            pm2 reload ecosystem.config.js --env production
+            pm2 save
+
+            echo "==> Deployment complete ✅"
